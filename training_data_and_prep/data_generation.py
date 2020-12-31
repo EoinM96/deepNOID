@@ -8,66 +8,67 @@ JSON_PATH = "raw_training_data/usable_data.json"
 SAMPLE_RATE = 22050
 TRACK_DURATION = 30
 
-def save_mfcc(dataset_path, json_path, num_mfcc=13, n_fft=2048, hop_length=512, num_segments=30):
-    """Extracts MFCCs from music dataset and saves them into a json file along witgh genre labels.
-        :param dataset_path (str): Path to dataset
-        :param json_path (str): Path to json file used to save MFCCs
-        :param num_mfcc (int): Number of coefficients to extract
-        :param n_fft (int): Interval we consider to apply FFT. Measured in # of samples
-        :param hop_length (int): Sliding window for FFT. Measured in # of samples
-        :param: num_segments (int): Number of segments we want to divide sample tracks into
-        :return:
-        """
 
-    # dictionary to store mapping, labels, and MFCCs
+def save_mfcc(dataset_path, json_path, num_mfcc=13, n_fft=2048, hop_length=512, num_segments=30):
+    """
+    Saves MFFC's from data in DATASET_PATH and exports them to JSON_PATH
+
+    :param dataset_path: Path to users training data
+    :param json_path: Path to location where JSON file is to write to (file name and extension included)
+    :param num_mfcc: Number of MFCC coefficients
+    :param n_fft: Number of fast Fourier transforms
+    :param hop_length: Number of samples to jump forward in track each evaluation
+    :param num_segments: How many segments to split track into for MFCC evaluation
+    :return: JSON file of data ready to use in RNN-LSTM model
+    """
+
+    # Dictionary to store mapping, labels, and MFCC's
     data = {
         "mapping": [],
         "labels": [],
         "mfcc": []
     }
 
-
-
-    # loop through all genre sub-folder
+    # Loop through all genre folders and tracks within them
     for i, (dirpath, dirnames, filenames) in enumerate(os.walk(dataset_path)):
 
-        # ensure we're processing a genre sub-folder level
+        # Ensure we aren't at top level path
         if dirpath is not dataset_path:
 
-            # save genre label (i.e., sub-folder name) in the mapping
+            # Save genre label/subfolder name in mapping
             semantic_label = dirpath.split("/")[-1]
             data["mapping"].append(semantic_label)
             print("\nProcessing: {}".format(semantic_label))
 
-            # process all audio files in genre sub-dir
+            # For all tracks in genre subfolder
             for f in filenames:
 
-                # load audio file
+                # Load track
                 file_path = os.path.join(dirpath, f)
                 signal, sample_rate = librosa.load(file_path, sr=SAMPLE_RATE)
                 samples_per_track = SAMPLE_RATE * TRACK_DURATION
                 samples_per_segment = int(samples_per_track / num_segments)
                 num_mfcc_vectors_per_segment = np.ceil(samples_per_segment / hop_length)
 
-                # process all segments of audio file
+                # Process each segment of track
                 for d in range(num_segments):
 
-                    # calculate start and finish sample for current segment
+                    # Calc start/end time for segment
                     start = samples_per_segment * d
                     finish = start + samples_per_segment
 
-                    # extract mfcc
+                    # MFCC extraction
                     mfcc = librosa.feature.mfcc(signal[start:finish], sample_rate, n_mfcc=num_mfcc, n_fft=n_fft,
                                                 hop_length=hop_length)
                     mfcc = mfcc.T
 
-                    # store only mfcc feature with expected number of vectors
+                    # Store MFCC data only if it is expected length (helps deal with EoF issues)
                     if len(mfcc) == num_mfcc_vectors_per_segment:
                         data["mfcc"].append(mfcc.tolist())
                         data["labels"].append(i - 1)
                         print("{}, segment:{}".format(file_path, d + 1))
 
-    # save MFCCs to json file
+    # Save MFCC's to JSON file
     with open(json_path, "w") as fp:
         json.dump(data, fp, indent=4)
 
